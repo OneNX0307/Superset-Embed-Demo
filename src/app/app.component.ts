@@ -1,7 +1,7 @@
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Component } from '@angular/core';
 import { embedDashboard } from '@superset-ui/embedded-sdk';
-import { map, of, switchMap } from 'rxjs';
+import { map, Observable, of, switchMap } from 'rxjs';
 import { environment } from 'src/environments/environment';
 
 interface LoginResponse {
@@ -44,11 +44,11 @@ export class AppComponent {
   constructor(private http: HttpClient) { }
 
   ngOnInit(): void {
-    this.handle();
+    this.embed();
   }
 
-  private handle() {
-    this.http.post<LoginResponse>("/api/v1/security/login", loginInfo)
+  private handle() : Observable<string>{
+    return this.http.post<LoginResponse>("/api/v1/security/login", loginInfo)
       .pipe(
         switchMap(loginResponse =>
           this.http.post<GuestResponse>("/api/v1/security/guest_token", guestInfo, {
@@ -60,20 +60,15 @@ export class AppComponent {
               map(response => response.token)
             )
         )
-      )
-      .subscribe(token => {
-        this.embed(token);
-      }, error => {
-        console.error(error);
-      });
+      );
   }
 
-  private embed(token: string) {
+  private embed() {
     embedDashboard({
       id: environment.superset.dashboardId, // given by the Superset embedding UI
       supersetDomain: environment.superset.baserUrl,
       mountPoint: document.getElementById("superset")!, // any html element that can contain an iframe
-      fetchGuestToken: () => of(token).toPromise() as Promise<string>,//new Promise(resolve => resolve(token)),
+      fetchGuestToken: () => this.handle().toPromise() as Promise<string>,//new Promise(resolve => resolve(token)),
       dashboardUiConfig: { hideTitle: true }, // dashboard UI config: hideTitle, hideTab, hideChartControls (optional)
       debug: true
     });
